@@ -6,24 +6,27 @@ import asyncio
 import json
 import os
 import sys
-import time
+import time 
 import logging
-from datetime import datetime
-from dotenv import load_dotenv
+from typing import Dict, Any, Optional
 
-# Ensure the project root is in the Python path
+
 project_root = os.path.abspath(os.path.dirname(__file__))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# Load environment variables from .env file
-load_dotenv(override=True)
+dotenv_path = os.path.join(project_root, '.env')
+if os.path.exists(dotenv_path):
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=dotenv_path, override=True)
+    print(f"Loaded .env file from: {dotenv_path}")
+else:
+    print(f"Warning: .env file not found at {dotenv_path}. Using system environment variables if set.")
 
-from core.interfaces import TaskDefinition, Program
+from core.interfaces import TaskDefinition, Program 
 from task_manager.agent import TaskManagerAgent
 from config import settings
 
-# Setup a string handler to capture log messages
 class StringIOHandler(logging.Handler):
     def __init__(self):
         super().__init__()
@@ -42,36 +45,44 @@ class StringIOHandler(logging.Handler):
     def clear(self):
         self.log_capture = []
 
-# Create a string handler
 string_handler = StringIOHandler()
 string_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 
-# Add handler to root logger
 root_logger = logging.getLogger()
+root_logger.setLevel(settings.LOG_LEVEL.upper() if hasattr(settings, 'LOG_LEVEL') else logging.INFO)
 root_logger.addHandler(string_handler)
 
-# Also send logs to console
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 root_logger.addHandler(console_handler)
 
-# Initialize logger for this module
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
-# Set module loggers to DEBUG to get more information
-for module in ['task_manager.agent', 'code_generator.agent', 'evaluator_agent.agent', 'database_agent.agent', 
+desired_agent_log_level_str = os.getenv("GRADIO_AGENT_LOG_LEVEL", "INFO").upper()
+agent_log_level = getattr(logging, desired_agent_log_level_str, logging.INFO)
+
+for module_name in ['task_manager.agent', 'code_generator.agent', 'evaluator_agent.agent', 'database_agent.agent', 
               'selection_controller.agent', 'prompt_designer.agent']:
-    logging.getLogger(module).setLevel(logging.DEBUG)
+    logging.getLogger(module_name).setLevel(agent_log_level)
 
-# Check if API key is set
-if settings.GEMINI_API_KEY.startswith("YOUR_API_KEY") or not settings.GEMINI_API_KEY:
-    API_KEY_WARNING = "⚠️ API key not properly set! Please set your Gemini API key in the .env file."
+API_KEY_WARNING = ""
+if not settings.LLM_PROVIDER:
+    API_KEY_WARNING = "⚠️ LLM_PROVIDER is not set in .env! Please configure it."
+elif settings.LLM_PROVIDER == "gemini":
+    if not settings.GEMINI_API_KEY or "YOUR_ACTUAL_GEMINI_API_KEY" in settings.GEMINI_API_KEY or "YOUR_GEMINI_API_KEY" in settings.GEMINI_API_KEY:
+        API_KEY_WARNING = "⚠️ Gemini API key (GEMINI_API_KEY) not properly set for 'gemini' provider in .env."
+elif settings.LLM_PROVIDER == "openai":
+    if not settings.OPENAI_API_KEY or "YOUR_OPENAI_API_KEY" in settings.OPENAI_API_KEY:
+        API_KEY_WARNING = "⚠️ OpenAI API key (OPENAI_API_KEY) not properly set for 'openai' provider in .env."
+elif settings.LLM_PROVIDER == "openai_compatible":
+    if not settings.OPENAI_COMPATIBLE_ENDPOINT_URL:
+        API_KEY_WARNING = "⚠️ OpenAI Compatible Endpoint URL (OPENAI_COMPATIBLE_ENDPOINT_URL) not set for 'openai_compatible' provider in .env."
+    elif not settings.OPENAI_COMPATIBLE_MODEL_NAME:
+         API_KEY_WARNING = "⚠️ OpenAI Compatible Model Name (OPENAI_COMPATIBLE_MODEL_NAME) not set for 'openai_compatible' provider in .env."
 else:
-    API_KEY_WARNING = ""
+    API_KEY_WARNING = f"⚠️ Unknown LLM_PROVIDER '{settings.LLM_PROVIDER}' configured in .env. Expected 'gemini', 'openai', or 'openai_compatible'."
 
-# Global variables for storing evolution state
-current_results = []
+current_best_program: Optional[Program] = None
 
 async def run_evolution(
     task_id, 
@@ -80,35 +91,48 @@ async def run_evolution(
     examples_json, 
     allowed_imports_text,
     population_size, 
-    generations
+    generations,
+    progress=gr.Progress(track_tqdm=True) 
 ):
-    """Run the evolutionary process with the given parameters."""
-    progress = gr.Progress()
-    # Clear previous logs
     string_handler.clear()
-    
+    global current_best_program
+    current_best_program = None
+    results_output = ""
+
+    original_pop_size = settings.POPULATION_SIZE
+    original_generations = settings.GENERATIONS
+
     try:
-        # Parse the input/output examples
+        logger.info(f"Starting Gradio 'run_evolution' for Task ID: {task_id}")
+        logger.info(f"LLM_PROVIDER from settings: {settings.LLM_PROVIDER}")
+        if API_KEY_WARNING and ("not set" in API_KEY_WARNING or "Unknown LLM_PROVIDER" in API_KEY_WARNING) :
+             results_output = f"Configuration Error: {API_KEY_WARNING}\nPlease check your .env file."
+             logger.error(results_output)
+             return results_output, string_handler.get_logs()
+
         try:
             examples = json.loads(examples_json)
             if not isinstance(examples, list):
-                return "Error: Examples must be a JSON list of objects with 'input' and 'output' keys."
-            
-            # Validate each example
-            for i, example in enumerate(examples):
-                if not isinstance(example, dict) or "input" not in example or "output" not in example:
-                    return f"Error in example {i+1}: Each example must be an object with 'input' and 'output' keys."
-        except json.JSONDecodeError:
-            return "Error: Examples must be valid JSON. Please check the format."
+                results_output = "Error: Input/Output Examples must be a JSON list of objects."
+                logger.error(results_output)
+                return results_output, string_handler.get_logs()
+            for i, example_item in enumerate(examples):
+                if not isinstance(example_item, dict) or "input" not in example_item or "output" not in example_item:
+                    results_output = f"Error in example {i+1}: Each example must be an object with 'input' and 'output' keys."
+                    logger.error(results_output)
+                    return results_output, string_handler.get_logs()
+        except json.JSONDecodeError as e:
+            results_output = f"Error: Input/Output Examples must be valid JSON. Details: {e}"
+            logger.error(results_output, exc_info=True)
+            return results_output, string_handler.get_logs()
         
-        # Parse allowed imports
         allowed_imports = [imp.strip() for imp in allowed_imports_text.split(",") if imp.strip()]
         
-        # Update settings from UI
         settings.POPULATION_SIZE = int(population_size)
         settings.GENERATIONS = int(generations)
         
-        # Create a task definition
+        logger.info(f"Runtime Settings: Population Size={settings.POPULATION_SIZE}, Generations={settings.GENERATIONS}")
+
         task = TaskDefinition(
             id=task_id,
             description=description,
@@ -117,136 +141,110 @@ async def run_evolution(
             allowed_imports=allowed_imports
         )
         
-        # Set up a progress callback
-        async def progress_callback(generation, max_generations, stage, message=""):
-            # Calculate progress based on generation and stage
-            # Stages: 0=init, 1=evaluation, 2=selection, 3=reproduction
-            stage_weight = 0.25  # Each stage is worth 25% of a generation
-            gen_progress = generation + (stage * stage_weight)
-            total_progress = gen_progress / max_generations
-            
-            # Update the progress bar
-            progress(min(total_progress, 0.99), f"Generation {generation}/{max_generations}: {message}")
-            
-            # Also log the progress
-            logger.info(f"Progress: Generation {generation}/{max_generations} - {message}")
-            
-            # Allow the UI to update
-            await asyncio.sleep(0.1)
-        
-        # Initialize the TaskManagerAgent with the task definition
-        task_manager = TaskManagerAgent(task_definition=task)
-        
-        # Add a custom attribute to track progress (doesn't affect the class behavior)
-        task_manager.progress_callback = progress_callback
-        
-        # Execute the evolutionary process with progress updates
-        progress(0, "Starting evolutionary process...")
-        
-        # First listener setup to catch log messages about generations
-        class GenerationProgressListener(logging.Handler):
-            def __init__(self):
+        progress(0.01, desc="Initializing Task Manager...") # Start with a small progress value
+
+        class GradioProgressListener(logging.Handler):
+            def __init__(self, gr_progress_obj, max_gens_total):
                 super().__init__()
-                self.current_gen = 0
-                self.max_gen = settings.GENERATIONS
+                self.gr_progress = gr_progress_obj
+                self.max_gens = max_gens_total
+                self.current_progress_value = 0.01 # Match initial
+                self.current_description = "Initializing..."
+                self.last_logged_gen = 0 # Track the generation number from logs
+
+            def update_progress(self, new_desc: str, progress_increment: Optional[float] = None):
+                self.current_description = new_desc
+                if progress_increment is not None:
+                    self.current_progress_value += progress_increment
+                    self.current_progress_value = min(self.current_progress_value, 1.0) # Cap at 1.0
                 
-            def emit(self, record):
+                # Ensure progress value is passed if track_tqdm is False or for manual updates.
+                # If track_tqdm is True, the visual bar is mainly driven by tqdm iterations.
+                # Calling progress() with a value might override or complement track_tqdm.
                 try:
-                    msg = record.getMessage()
-                    # Check for generation progress messages
-                    if "--- Generation " in msg:
-                        gen_parts = msg.split("Generation ")[1].split("/")[0]
-                        try:
-                            self.current_gen = int(gen_parts)
-                            # Update progress bar
-                            asyncio.create_task(
-                                progress_callback(
-                                    self.current_gen, 
-                                    self.max_gen, 
-                                    0, 
-                                    "Starting generation"
-                                )
-                            )
-                        except ValueError:
-                            pass
-                    elif "Evaluating population" in msg:
-                        # Update progress for evaluation stage
-                        asyncio.create_task(
-                            progress_callback(
-                                self.current_gen, 
-                                self.max_gen, 
-                                1, 
-                                "Evaluating population"
-                            )
-                        )
-                    elif "Selected " in msg and " parents" in msg:
-                        # Update progress for selection stage
-                        asyncio.create_task(
-                            progress_callback(
-                                self.current_gen, 
-                                self.max_gen, 
-                                2, 
-                                "Selected parents"
-                            )
-                        )
-                    elif "Generated " in msg and " offspring" in msg:
-                        # Update progress for reproduction stage
-                        asyncio.create_task(
-                            progress_callback(
-                                self.current_gen, 
-                                self.max_gen, 
-                                3, 
-                                "Generated offspring"
-                            )
-                        )
-                except Exception:
-                    pass
+                    self.gr_progress(self.current_progress_value, desc=self.current_description)
+                except Exception as e:
+                    logger.warning(f"GradioProgressListener: Error updating progress UI: {e}")
+
+
+            def emit(self, record):
+                msg = record.getMessage()
+                new_desc_for_ui = self.current_description # Default to current
+                gen_progress_increment = None
+
+                if "--- Generation" in msg and "/" in msg:
+                    try:
+                        gen_part = msg.split("--- Generation")[1].strip().split("/")[0]
+                        current_gen_from_log = int(gen_part)
+                        if current_gen_from_log > self.last_logged_gen:
+                            self.last_logged_gen = current_gen_from_log
+                            # Calculate an increment if max_gens is known
+                            if self.max_gens > 0:
+                                gen_progress_increment = (1.0 - self.current_progress_value) / (self.max_gens - current_gen_from_log + 1) if (self.max_gens - current_gen_from_log + 1) > 0 else 0.05
+
+                        new_desc_for_ui = f"Running Generation {current_gen_from_log}/{self.max_gens}"
+                    except Exception: pass
+                elif "Initializing population" in msg:
+                    new_desc_for_ui = f"Gen {self.last_logged_gen}: Initializing population"
+                elif "Evaluating population" in msg:
+                    new_desc_for_ui = f"Gen {self.last_logged_gen}: Evaluating population"
+                elif "Selected" in msg and "parents" in msg:
+                     new_desc_for_ui = f"Gen {self.last_logged_gen}: Selecting parents"
+                elif "Generated" in msg and "offspring" in msg:
+                     new_desc_for_ui = f"Gen {self.last_logged_gen}: Generating offspring"
+                elif "Evolutionary cycle completed." in msg:
+                    new_desc_for_ui = "Finishing up..."
+                    # Don't set gen_progress_increment here, let the final progress(1.0, ...) handle it
+                
+                if new_desc_for_ui != self.current_description or gen_progress_increment is not None:
+                    self.update_progress(new_desc_for_ui, gen_progress_increment)
+
+
+        gr_progress_listener = GradioProgressListener(progress, settings.GENERATIONS)
+        gr_progress_listener.setLevel(logging.INFO)
+        task_manager_logger = logging.getLogger('task_manager.agent')
+        task_manager_logger.addHandler(gr_progress_listener)
         
-        # Add our progress listener
-        progress_listener = GenerationProgressListener()
-        progress_listener.setLevel(logging.INFO)
-        root_logger.addHandler(progress_listener)
+        task_manager = TaskManagerAgent(task_definition=task)
+        logger.info("TaskManagerAgent initialized. Starting evolution...")
         
-        try:
-            # Execute the evolutionary process
-            best_programs = await task_manager.execute()
-            progress(1.0, "Evolution completed!")
-            
-            # Store results for display
-            global current_results
-            current_results = best_programs if best_programs else []
-            
-            # Format results
-            if best_programs:
-                result_text = f"✅ Evolution completed successfully! Found {len(best_programs)} solution(s).\n\n"
-                for i, program in enumerate(best_programs):
-                    result_text += f"### Solution {i+1}\n"
-                    result_text += f"- ID: {program.id}\n"
-                    result_text += f"- Fitness: {program.fitness_scores}\n"
-                    result_text += f"- Generation: {program.generation}\n\n"
-                    result_text += "```python\n" + program.code + "\n```\n\n"
-                return result_text
-            else:
-                return "❌ Evolution completed, but no suitable solutions were found."
-        finally:
-            # Remove our progress listener when done
-            root_logger.removeHandler(progress_listener)
-    
+        best_program_result = await task_manager.execute()
+        progress(1.0, desc="Evolution Completed!")
+
+        if best_program_result:
+            current_best_program = best_program_result
+            program = current_best_program
+            results_output = f"✅ Evolution completed successfully! Best solution found:\n\n"
+            results_output += f"### Solution Details (ID: {program.id})\n"
+            fitness_str = json.dumps(program.fitness_scores, indent=2)
+            results_output += f"- **Fitness Scores:**\n```json\n{fitness_str}\n```\n"
+            results_output += f"- **Discovered in Generation:** {program.generation}\n\n"
+            # Ensure function_name_to_evolve exists on program object or use the input one
+            func_name_display = program.function_name_to_evolve if hasattr(program, 'function_name_to_evolve') and program.function_name_to_evolve else function_name
+            results_output += f"**Generated Code (`{func_name_display}`):**\n"
+            results_output += "```python\n" + program.code.strip() + "\n```\n\n"
+            if program.errors:
+                error_list_str = "\n".join([f"  - {e}" for e in program.errors])
+                results_output += f"**Note:** This program had the following messages/errors during its last evaluation:\n{error_list_str}\n"
+            logger.info(f"Evolution completed. Best program ID: {program.id}. Fitness: {program.fitness_scores}")
+        else:
+            results_output = "❌ Evolution completed, but no suitable solution was found."
+            logger.info(results_output)
+        
+        return results_output, string_handler.get_logs()
+
     except Exception as e:
         import traceback
-        return f"Error during evolution: {str(e)}\n\n{traceback.format_exc()}"
+        logger.error("Unhandled error during Gradio 'run_evolution'", exc_info=True)
+        results_output = f"💥 An unexpected error occurred: {str(e)}\n\nTrace:\n{traceback.format_exc()}"
+        return results_output, string_handler.get_logs()
+    finally:
+        settings.POPULATION_SIZE = original_pop_size
+        settings.GENERATIONS = original_generations
+        if 'task_manager_logger' in locals() and 'gr_progress_listener' in locals() and gr_progress_listener in task_manager_logger.handlers:
+            task_manager_logger.removeHandler(gr_progress_listener)
 
-def get_code(solution_index):
-    """Get the code for a specific solution."""
-    try:
-        if current_results and 0 <= solution_index < len(current_results):
-            program = current_results[solution_index]
-            return program.code
-        return "No solution available at this index."
-    except Exception as e:
-        return f"Error retrieving solution: {str(e)}"
 
-# Example templates: Fibonacci task
 FIB_EXAMPLES = '''[
     {"input": [0], "output": 0},
     {"input": [1], "output": 1},
@@ -255,107 +253,127 @@ FIB_EXAMPLES = '''[
 ]'''
 
 def set_fib_example():
-    """Populate the form with the Fibonacci task example."""
     return (
-        "fibonacci_task",
-        "Write a Python function that computes the nth Fibonacci number (0-indexed), where fib(0)=0 and fib(1)=1.",
+        "fibonacci_example_001",
+        "Write a Python function named `fibonacci` that computes the nth Fibonacci number (0-indexed), where fib(0)=0 and fib(1)=1. The input will be a list containing a single integer argument `n` passed to the function.",
         "fibonacci",
         FIB_EXAMPLES,
         ""
     )
 
-# Create the Gradio interface
-with gr.Blocks(title="OpenAlpha_Evolve") as demo:
+DEFAULT_DIJKSTRA_EXAMPLES = """
+[
+    {
+        "input": {
+            "graph": {
+                "0": {"1": 4, "7": 8},
+                "1": {"0": 4, "2": 8, "7": 11},
+                "2": {"1": 8, "3": 7, "8": 2, "5": 4},
+                "3": {"2": 7, "4": 9, "5": 14},
+                "4": {"3": 9, "5": 10},
+                "5": {"2": 4, "3": 14, "4": 10, "6": 2},
+                "6": {"5": 2, "7": 1, "8": 6},
+                "7": {"0": 8, "1": 11, "6": 1, "8": 7},
+                "8": {"2": 2, "6": 6, "7": 7}
+            },
+            "source_node": "0"
+        },
+        "output": {"0": 0, "1": 4, "2": 12, "3": 19, "4": 21, "5": 11, "6": 9, "7": 8, "8": 14}
+    },
+    {
+        "input": {"graph": {"A": {"B": 1, "C": 4}, "B": {"A":1, "C":2, "D":5}, "C":{"A":4, "B":2, "D":1}, "D":{"B":5, "C":1}}, "source_node": "A"},
+        "output": {"A":0, "B":1, "C":3, "D":4}
+    }
+]
+"""
+
+def set_dijkstra_example():
+    return (
+        "dijkstra_example_001",
+        "Implement Dijkstra's algorithm for shortest paths in a weighted graph. The function should take `graph` (an adjacency list dictionary, e.g., {'node_id': {'neighbor_id': weight}}) and `source_node` (the starting node ID) as input. It must return a dictionary mapping all reachable node IDs (including the source) to their shortest distance from the source. Use float('inf') for unreachable nodes. Ensure all nodes present in the graph structure (as keys or neighbor values) are considered for initialization and are present as keys in the output dictionary.",
+        "dijkstra",
+        DEFAULT_DIJKSTRA_EXAMPLES,
+        "heapq, math, sys"
+    )
+
+with gr.Blocks(title="OpenAlpha_Evolve", theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 🧬 OpenAlpha_Evolve: AI-Driven Algorithm Evolution")
     
     if API_KEY_WARNING:
-        gr.Markdown(f"## ⚠️ {API_KEY_WARNING}")
+        gr.Warning(API_KEY_WARNING)
     
     with gr.Row():
-        with gr.Column(scale=1):
-            gr.Markdown("## Task Definition")
+        with gr.Column(scale=2):
+            gr.Markdown("## 📝 Task Definition")
             
-            task_id = gr.Textbox(
-                label="Task ID", 
-                placeholder="e.g., fibonacci_task",
-                value="fibonacci_task"
-            )
+            task_id_input = gr.Textbox(label="Task ID", value="fibonacci_001")
+            description_input = gr.Textbox(label="Task Description", lines=5)
+            function_name_input = gr.Textbox(label="Function Name to Evolve")
             
-            description = gr.Textbox(
-                label="Task Description", 
-                placeholder="Describe the problem clearly...",
-                value="Write a Python function that computes the nth Fibonacci number (0-indexed), where fib(0)=0 and fib(1)=1.",
-                lines=5
-            )
-            
-            function_name = gr.Textbox(
-                label="Function Name to Evolve", 
-                placeholder="e.g., fibonacci",
-                value="fibonacci"
-            )
-            
-            examples_json = gr.Code(
-                label="Input/Output Examples (JSON)",
-                language="json",
-                value=FIB_EXAMPLES,
+            examples_json_input = gr.Code(
+                label="Input/Output Examples (JSON format)", 
+                language="json", 
                 lines=10
             )
             
-            allowed_imports = gr.Textbox(
-                label="Allowed Imports (comma-separated)",
-                placeholder="e.g., math",
-                value=""
+            allowed_imports_input = gr.Textbox(
+                label="Allowed Imports (comma-separated)", 
+                placeholder="e.g., math, heapq"
             )
             
+            gr.Markdown("### Evolutionary Parameters")
             with gr.Row():
-                population_size = gr.Slider(
-                    label="Population Size",
-                    minimum=2, 
-                    maximum=10, 
-                    value=3, 
-                    step=1
-                )
-                
-                generations = gr.Slider(
-                    label="Generations",
-                    minimum=1, 
-                    maximum=5, 
-                    value=2, 
-                    step=1
-                )
+                population_size_input = gr.Slider(label="Population Size", minimum=2, maximum=20, value=settings.POPULATION_SIZE, step=1)
+                generations_input = gr.Slider(label="Generations", minimum=1, maximum=20, value=settings.GENERATIONS, step=1)
             
-            with gr.Row():
-                fib_btn = gr.Button("🔢 Fibonacci Example")
-                run_btn = gr.Button("🚀 Run Evolution", variant="primary")
+            with gr.Accordion("Load Example Task", open=False):
+                with gr.Row():
+                    fib_btn = gr.Button("🔢 Fibonacci")
+                    dijkstra_btn = gr.Button("🗺️ Dijkstra")
+            
+            run_btn = gr.Button("🚀 Run Evolution", variant="primary", scale=2)
         
-        with gr.Column(scale=1):
-            with gr.Tab("Results"):
-                results_text = gr.Markdown("Evolution results will appear here...")
-            
-            # No Live Logs tab: progress is shown in terminal only
-    
-    # Event handlers
-    # Example setter for Fibonacci
+        with gr.Column(scale=3):
+            gr.Markdown("## 📊 Results & Logs")
+            with gr.Tabs():
+                with gr.TabItem("🏆 Best Solution"):
+                    results_markdown_output = gr.Markdown("Evolution results will appear here...")
+                with gr.TabItem("📜 Console Logs"):
+                    logs_output = gr.Textbox(label="Log Output (from current run)", lines=25, autoscroll=True, interactive=False, max_lines=1000)
+   
+    (default_task_id, default_desc, default_func_name, default_examples, default_imports) = set_fib_example()
+    task_id_input.value = default_task_id
+    description_input.value = default_desc
+    function_name_input.value = default_func_name
+    examples_json_input.value = default_examples
+    allowed_imports_input.value = default_imports
+
     fib_btn.click(
-        set_fib_example,
-        outputs=[task_id, description, function_name, examples_json, allowed_imports]
+        set_fib_example, 
+        outputs=[task_id_input, description_input, function_name_input, examples_json_input, allowed_imports_input]
+    )
+    dijkstra_btn.click(
+        set_dijkstra_example,
+        outputs=[task_id_input, description_input, function_name_input, examples_json_input, allowed_imports_input]
     )
     
-    run_evolution_event = run_btn.click(
-        run_evolution,
+    run_btn.click(
+        run_evolution, 
         inputs=[
-            task_id, 
-            description, 
-            function_name, 
-            examples_json,
-            allowed_imports,
-            population_size, 
-            generations
-        ],
-        outputs=results_text
+            task_id_input, description_input, function_name_input, 
+            examples_json_input, allowed_imports_input,
+            population_size_input, generations_input
+        ], 
+        outputs=[results_markdown_output, logs_output]
     )
 
-# Launch the app
 if __name__ == "__main__":
-    # Launch with share=True to create a public link
-    demo.launch(share=True) 
+    logger.info(f"Starting Gradio app. Project root: {project_root}")
+    logger.info(f"Attempting to load .env from: {dotenv_path}")
+    logger.info(f"Initial LLM_PROVIDER from settings: {settings.LLM_PROVIDER}")
+    if API_KEY_WARNING:
+        logger.warning(f"Gradio App API Key/Config Warning: {API_KEY_WARNING}")
+    else:
+        logger.info("API Key/Config check passed for the selected LLM provider.")
+
+    demo.launch(share=False, debug=True)

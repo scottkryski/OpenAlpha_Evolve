@@ -1,10 +1,13 @@
-# OpenAlpha_Evolve: Regenerating Autonomous Algorithmic Discovery 🚀 
-### PR REVIEW: Corrected typo "OpenAplha_Evolve" to "OpenAlpha_Evolve"
+// README.md
+# OpenAlpha_Evolve: Regenerating Autonomous Algorithmic Discovery 🚀
 
 ![openalpha_evolve_workflow](https://github.com/user-attachments/assets/9d4709ad-0072-44ae-bbb5-7eea1c5fa08c)
-### PR REVIEW: Ensure this image URL is stable or embed the image directly in the repository (e.g., in an `assets` folder) and use a relative link.
+*Note: The image URL above might be temporary. If contributing, consider embedding images in the repo.*
 
-OpenAlpha_Evolve is an open-source Python framework inspired by the groundbreaking research on autonomous coding agents like DeepMind's AlphaDev (often conceptualized as AlphaEvolve-like systems). It's a **regeneration** of the core idea: an intelligent system that iteratively writes, tests, and improves code using Large Language Models (LLMs) like Google's Gemini, OpenAI's GPT models, or local OpenAI-API compatible models (e.g., via Ollama), guided by the principles of evolution.
+OpenAlpha_Evolve is an open-source Python framework inspired by the groundbreaking research on autonomous coding agents like DeepMind's AlphaDev. It's a **regeneration** of the core idea: an intelligent system that iteratively writes, tests, and improves code using Large Language Models (LLMs), guided by the principles of evolution. This version supports:
+*   Google Gemini API
+*   OpenAI API (GPT-3.5, GPT-4, etc.)
+*   OpenAI-Compatible Endpoints for Local LLMs (e.g., via Ollama, LiteLLM, vLLM)
 
 Our mission is to provide an accessible, understandable, and extensible platform for researchers, developers, and enthusiasts to explore the fascinating intersection of AI, code generation, and automated problem-solving.
 
@@ -12,12 +15,12 @@ Our mission is to provide an accessible, understandable, and extensible platform
 
 ---
 
-##  The Vision: AI-Driven Algorithmic Innovation
+## ✨ The Vision: AI-Driven Algorithmic Innovation
 
 Imagine an agent that can:
 
 *   Understand a complex problem description.
-*   Generate initial algorithmic solutions.
+*   Generate initial algorithmic solutions using powerful LLMs.
 *   Rigorously test its own code.
 *   Learn from failures and successes.
 *   Evolve increasingly sophisticated and efficient algorithms over time.
@@ -26,63 +29,60 @@ OpenAlpha_Evolve is a step towards this vision. It's not just about generating c
 
 ---
 
-##  How It Works: The Evolutionary Cycle
+## 🧠 How It Works: The Evolutionary Cycle
 
-OpenAlpha_Evolve employs a modular, agent-based architecture to orchestrate an evolutionary process:
+OpenAlpha_Evolve employs a modular, agent-based architecture:
 
-1.  **Task Definition**: You, the user, define the algorithmic "quest" – the problem to be solved, including examples of inputs and expected outputs, and allowed library imports.
-2.  **Prompt Engineering (`PromptDesignerAgent`)**: This agent crafts intelligent prompts for the LLM. It designs:
-    *   *Initial Prompts*: To generate the first set of candidate solutions.
-    *   *Mutation Prompts*: To introduce variations and improvements to existing solutions.
-    *   *Bug-Fix Prompts*: To guide the LLM in correcting errors from previous attempts.
-3.  **Code Generation (`CodeGeneratorAgent`)**: Powered by an LLM (supporting Gemini, OpenAI, and OpenAI-compatible local models), this agent takes the prompts and generates Python code.
-4.  **Evaluation (`EvaluatorAgent`)**: The generated code is put to the test!
-    *   *Syntax Check*: Is the code valid Python?
-    *   *Execution*: The code is run in a sandboxed environment against the input/output examples defined in the task.
-    *   *Fitness Scoring*: Programs are scored based on correctness, efficiency (runtime), and other potential metrics.
-5.  **Database (`DatabaseAgent`)**: All programs (code, fitness, generation, lineage) are stored, creating a record of the evolutionary history. (Currently In-Memory).
-6.  **Selection (`SelectionControllerAgent`)**: The "survival of the fittest" principle in action. This agent selects:
-    *   *Parents*: Promising programs from the current generation to produce offspring.
-    *   *Survivors*: The best programs from both the current population and new offspring to advance to the next generation.
-7.  **Iteration**: This cycle repeats for a defined number of generations, with each new generation aiming to produce better solutions than the last.
-8.  **Orchestration (`TaskManagerAgent`)**: The maestro of the operation, coordinating all other agents and managing the overall evolutionary loop.
+1.  **Task Definition**: You define the algorithmic "quest" – the problem, input/output examples, and allowed library imports.
+2.  **Prompt Engineering (`PromptDesignerAgent`)**: Crafts intelligent prompts for the LLM (initial, mutation, bug-fix).
+3.  **Code Generation (`CodeGeneratorAgent`)**: Powered by your chosen LLM (Gemini, OpenAI, or OpenAI-compatible local model), this agent generates Python code.
+4.  **Evaluation (`EvaluatorAgent`)**: Tests the generated code for syntax and functional correctness against task examples in an isolated environment. Scores fitness (correctness, runtime).
+5.  **Database (`DatabaseAgent`)**: Stores programs, fitness, and evolutionary history (currently In-Memory).
+6.  **Selection (`SelectionControllerAgent`)**: Applies "survival of the fittest" to select parents for the next generation and survivors.
+7.  **Iteration**: Repeats the cycle, aiming for better solutions each generation.
+8.  **Orchestration (`TaskManagerAgent`)**: Coordinates all agents and manages the evolutionary loop.
 
 ---
 
-##  Key Features
+## 🚀 Key Features
 
 *   **Flexible LLM Backends**:
-    *   Google Gemini API.
-    *   OpenAI API (GPT-3.5, GPT-4, etc.).
-    *   OpenAI-Compatible Endpoints: Supports local LLMs served via tools like Ollama, LiteLLM, vLLM, etc., using the standard OpenAI API format.
-*   **Evolutionary Algorithm Core**: Implements iterative improvement through selection, mutation (via prompting), and survival.
-*   **Modular Agent Architecture**: Easily extend or replace individual components.
-*   **Automated Program Evaluation**: Syntax checking and functional testing against user-provided examples.
-*   **Configuration Management**: Easily tweak parameters like population size, number of generations, and LLM settings via a `.env` file and `config/settings.py`.
-*   **Detailed Logging**: Comprehensive logs provide insights into each step.
-*   **Open Source & Extensible**: Built with Python, designed for experimentation.
+    *   **Google Gemini API**: Leverages models like `gemini-1.5-flash` or `gemini-1.5-pro`.
+    *   **OpenAI API**: Supports models like `gpt-3.5-turbo`, `gpt-4`, `gpt-4o`, etc.
+    *   **OpenAI-Compatible Endpoints**: Enables use of local LLMs served via tools like Ollama, LiteLLM, Jan.ai, vLLM, etc., that expose an OpenAI-compatible API.
+*   **Evolutionary Algorithm Core**: Implements iterative improvement through selection, LLM-driven mutation/bug-fixing, and survival.
+*   **Modular Agent Architecture**: Easily extend or replace components (e.g., use a different LLM evaluation strategy, or database).
+*   **Automated Program Evaluation**: Syntax checking and functional testing against user-provided examples with timeout mechanisms.
+*   **Configuration Management**: Easily tweak parameters (population size, generations, LLM models, API settings) via `.env` and `config/settings.py`.
+*   **Detailed Logging**: Comprehensive logs for insights into the evolutionary process.
+*   **Open Source & Extensible**: Built with Python, designed for experimentation and community contributions.
 
 ---
 
-##  Project Structure\
+## 📂 Project Structure
 OpenAlpha_Evolve/
-├── code_generator/ # Agent for LLM-based code generation
-├── database_agent/ # Agent for storing/retrieving programs
-├── evaluator_agent/ # Agent for evaluating generated code
-├── prompt_designer/ # Agent for designing LLM prompts
-├── selection_controller/ # Agent for evolutionary selection
-├── task_manager/ # Agent orchestrating the main loop
-├── rl_finetuner/ # (Placeholder) For RL-based prompt/model tuning
-├── monitoring_agent/ # (Placeholder) For monitoring metrics
+├── agents/ # Core intelligent agents (subdirectories for each)
+│ ├── code_generator/ # Agent for LLM-based code generation
+│ ├── database_agent/ # Agent for storing/retrieving programs
+│ ├── evaluator_agent/ # Agent for evaluating generated code
+│ ├── prompt_designer/ # Agent for designing LLM prompts
+│ ├── selection_controller/ # Agent for evolutionary selection
+│ └── task_manager/ # Agent orchestrating the main loop
 ├── config/ # Configuration files (settings.py)
 ├── core/ # Core interfaces, data models (Program, TaskDefinition)
 ├── utils/ # Utility functions (currently minimal)
 ├── tests/ # Unit and integration tests (to be expanded)
 ├── scripts/ # Helper scripts (currently minimal)
-├── main.py # Main entry point to run the system
+├── main.py # Main entry point to run the system from CLI
+├── app.py # Gradio Web UI entry point
 ├── requirements.txt # Project dependencies
 ├── .env.example # Example for environment variables (copy to .env)
+├── .gitignore # Specifies intentionally untracked files
+├── LICENSE.md # Project's license information (MIT License)
 └── README.md # This file!
+
+
+---
 
 ## 🏁 Getting Started
 
@@ -93,8 +93,8 @@ OpenAlpha_Evolve/
 
 2.  **Clone the Repository**:
     ```bash
-    git clone https://github.com/shyamsaktawat/OpenAlpha_Evolve.git # ### PR REVIEW: Or the original repo URL if this is a fork
-    cd OpenAlpha_Evolve 
+    git clone https://github.com/shyamsaktawat/OpenAlpha_Evolve.git # Or your forked repository URL
+    cd OpenAlpha_Evolve
     ```
 
 3.  **Set Up a Virtual Environment** (recommended):
@@ -108,114 +108,122 @@ OpenAlpha_Evolve/
     pip install -r requirements.txt
     ```
 
-5.  **Set Up Environment Variables**:
-    *   Copy `.env.example` to a new file named `.env`:
+5.  **Set Up Environment Variables (Crucial for LLM Access)**:
+    *   Copy `.env.example` to a new file named `.env` in the project root:
         ```bash
         cp .env.example .env
         ```
-    *   Edit `.env` and configure it for your chosen LLM provider. **Only configure one provider section.**
+    *   **Edit the `.env` file** and configure it for **one** LLM provider of your choice:
 
-        **For Google Gemini:**
+        **Option 1: For Google Gemini API**
         ```dotenv
         LLM_PROVIDER="gemini"
         GEMINI_API_KEY="YOUR_ACTUAL_GEMINI_API_KEY"
-        GEMINI_MODEL_NAME="gemini-1.5-flash-latest" # Or other compatible Gemini models
+        GEMINI_MODEL_NAME="gemini-1.5-flash-latest" # Or "gemini-1.5-pro-latest"
         ```
-        *Obtain your API key from Google AI Studio.*
+        *Obtain your API key from [Google AI Studio](https://aistudio.google.com/app/apikey).*
 
-        **For OpenAI API:**
+        **Option 2: For OpenAI API**
         ```dotenv
         LLM_PROVIDER="openai"
-        OPENAI_API_KEY="YOUR_OPENAI_API_KEY" # sk-....
-        OPENAI_MODEL_NAME="gpt-3.5-turbo" # Or "gpt-4", "gpt-4-turbo", etc.
+        OPENAI_API_KEY="YOUR_OPENAI_API_KEY" # e.g., sk-....
+        OPENAI_MODEL_NAME="gpt-4o" # Or "gpt-3.5-turbo", "gpt-4-turbo", etc.
         ```
 
-        **For OpenAI-Compatible Local LLM (e.g., Ollama):**
+        **Option 3: For OpenAI-Compatible Local LLM (e.g., using Ollama)**
         ```dotenv
         LLM_PROVIDER="openai_compatible"
-        # Example for Ollama running locally:
-        OPENAI_COMPATIBLE_ENDPOINT_URL="http://localhost:11434/v1" 
-        OPENAI_COMPATIBLE_MODEL_NAME="llama3" # The model name as served by Ollama (e.g., "llama3", "codellama:7b-instruct")
-        OPENAI_COMPATIBLE_API_KEY="ollama" # Often "not-needed", "ollama", or any string if not required by your endpoint
-        OPENAI_COMPATIBLE_NUM_CTX="4096" # Optional: context window size if your server supports it (e.g., for Ollama)
-        ```
-        *Ensure your local LLM server (like Ollama) is running and the model is downloaded/available.*
 
-6.  **Run OpenAlpha_Evolve!**
+        # Example for Ollama running locally:
+        # 1. Ensure Ollama is installed and running (ollama serve)
+        # 2. Pull a model: ollama pull llama3
+        OPENAI_COMPATIBLE_ENDPOINT_URL="http://localhost:11434/v1"
+        OPENAI_COMPATIBLE_MODEL_NAME="llama3" # The model name as served by Ollama (e.g., "llama3", "codellama:7b-instruct", "qwen2:7b")
+        OPENAI_COMPATIBLE_API_KEY="ollama"    # Often "ollama", "not-needed", or any string if not required by your endpoint.
+        OPENAI_COMPATIBLE_NUM_CTX="4096"      # Optional: context window size if your server/model supports it (e.g., for Ollama's num_ctx).
+                                             # Remove or leave blank if not needed/supported.
+        ```
+        *Ensure your local LLM server (like Ollama) is running and the specified model is downloaded/available.*
+
+6.  **Review Configuration (Optional)**:
+    *   Open `config/settings.py`. Here you can adjust evolutionary parameters like `POPULATION_SIZE`, `GENERATIONS`, logging levels, etc. Defaults are generally reasonable for a start.
+
+7.  **Run OpenAlpha_Evolve (CLI)**:
     The `main.py` file is configured with an example task (Dijkstra's algorithm). To run it:
     ```bash
-    python main.py 
+    python main.py
     ```
-    Watch the logs to see the evolutionary process unfold! The default logging level is INFO. For more details, you can change `LOG_LEVEL` in `config/settings.py` to `DEBUG`.
+    Watch the logs in your terminal to see the evolutionary process! Log files are also saved to `alpha_evolve.log` by default.
+
+8.  **Run OpenAlpha_Evolve (Web UI with Gradio)**:
+    You can also interact with the system and define tasks through a web UI.
+    ```bash
+    python app.py
+    ```
+    Gradio will display a local URL (e.g., `http://127.0.0.1:7860`). Open this in your browser.
 
 ---
 
 ## 💡 Defining Your Own Algorithmic Quests!
 
-Want to challenge OpenAlpha_Evolve with a new problem?
+To challenge OpenAlpha_Evolve with a new problem:
 
-1.  **Open `main.py`** (or your own script that uses `TaskManagerAgent`).
-2.  **Create or Modify a `TaskDefinition` object**:
-    *   `id`: A unique string identifier for your task.
-    *   `description`: A clear, detailed natural language description of the problem. This is crucial for the LLM.
-    *   `function_name_to_evolve`: The name of the Python function the agent should create/evolve.
-    *   `input_output_examples`: A list of dictionaries. Each dictionary must have:
-        *   `"input"`: The input(s) for the function. This can be a single value, a list (for multiple positional arguments), or a dictionary (for named arguments).
-        *   `"output"`: The corresponding expected output.
-        *   Example: `{"input": {"numbers": [1, 2, 3]}, "output": 6}` or `{"input": [[1,2], 3], "output": 6}`
-    *   `allowed_imports`: A list of Python standard library modules/submodules the generated code is allowed to import (e.g., `["heapq", "math", "sys", "collections.defaultdict"]`).
-    *   `evaluation_criteria` (Optional): A string or dictionary describing how success is measured (e.g., "Prioritize correctness, then minimize runtime.").
-    *   `initial_code_prompt` (Optional): A specific initial prompt for the LLM if the default isn't suitable.
-    *   `hints` (Conceptual - for future enhancement): You might extend `TaskDefinition` to include structured hints for different stages (initial prompt, error fixing) to make `PromptDesignerAgent` more adaptable.
+1.  **Modify `main.py` (for CLI) or use the Gradio UI (`app.py`)**.
+2.  **Define/Update the `TaskDefinition` object with**:
+    *   `id`: A unique string identifier (e.g., "sort_list_task").
+    *   `description`: A clear, detailed natural language description of the problem. Crucial for the LLM.
+    *   `function_name_to_evolve`: The Python function name the agent should create/evolve (e.g., "custom_sort").
+    *   `input_output_examples`: A list of dictionaries, each with `"input"` and `"output"`.
+        *   Inputs can be single values, lists (for positional args), or dicts (for named args).
+        *   Use `float('inf')` or `float('-inf')` directly in Python code for examples (JSON in Gradio needs "Infinity").
+    *   `allowed_imports`: List of Python standard libraries allowed (e.g., `["heapq", "math"]`).
+    *   (Optional) `evaluation_criteria`: String describing success measures.
+    *   (Optional) `initial_code_prompt`: Override default initial prompt.
+3.  **Run the agent** as described in step 7 or 8 above.
 
-3.  **Instantiate `TaskManagerAgent` with your `TaskDefinition`**.
-4.  **Run the agent's `execute()` method.**
-
-The quality of your `description` and `input_output_examples` significantly impacts the agent's success!
+The quality of your `description` and `input_output_examples` significantly impacts success!
 
 ---
 
-##  The Horizon: Future Evolution
+## 🔮 The Horizon: Future Evolution
 
-OpenAlpha_Evolve is a living project. Here are some directions we're excited to explore:
+OpenAlpha_Evolve is a living project. Future directions include:
 
-*   **Advanced Evaluation Sandboxing**: More robust and secure sandboxing (e.g., using Docker, E2B, or Firejail) for code execution.
-*   **Sophisticated Fitness Metrics**: Beyond correctness/runtime, including complexity, style, resource usage.
-*   **Reinforcement Learning for Prompt Strategy**: Implementing `RLFineTunerAgent` to optimize prompt engineering.
-*   **Enhanced Monitoring & Visualization**: Tools to visualize evolution, track fitness, via `MonitoringAgent`.
-*   **Wider LLM Support & Fine-tuning**: Easier integrations and support for fine-tuning LLMs on successful programs.
-*   **Self-Correction & Reflection**: Deeper analysis of failures to refine problem-solving.
-*   **Diverse Task Domains**: Applying to more problem types.
-*   **Task-Specific Hinting System**: A more robust way to inject task-specific advice into prompts.
-*   **Community-Driven Task Library**: A collection of challenging tasks.
+*   **Advanced Evaluation Sandboxing**: More robust, secure sandboxing (e.g., Docker, E2B, Firejail).
+*   **Sophisticated Fitness Metrics**: Code complexity, style, resource usage.
+*   **Reinforcement Learning for Prompt Strategy**: Dynamic optimization of prompt engineering.
+*   **Enhanced Monitoring & Visualization**: Tools to visualize evolution and agent behavior.
+*   **Broader LLM Support & Fine-tuning**: Easier integrations and support for fine-tuning LLMs.
+*   **Self-Correction & Reflection**: Deeper analysis of failures.
+*   **Community-Driven Task Library**: A collection of interesting tasks.
+*   **Crossover Implementation**: Adding genetic crossover alongside LLM-driven mutation.
 
 ---
 
-##  Join the Evolution: Contributing
+## 🤝 Join the Evolution: Contributing
 
 This is an open invitation to collaborate!
 
-*   **Report Bugs**: Find an issue? Let us know by opening a GitHub Issue.
-*   **Suggest Features**: Have an idea? Open a GitHub Issue with a feature request.
+*   **Report Bugs**: Find an issue? Create an issue on GitHub!
+*   **Suggest Features**: Have an idea? Open an issue to discuss it!
 *   **Submit Pull Requests**:
     *   Fork the repository.
-    *   Create a new branch for your feature or bugfix.
-    *   Write clean, well-documented code.
-    *   Add tests for your changes if possible.
-    *   Ensure your changes don't break existing functionality.
+    *   Create a new branch (`git checkout -b feature/your-feature-name`).
+    *   Write clean, well-documented code. Add tests if applicable.
+    *   Ensure changes don't break existing functionality (test other LLM providers if you change shared code).
     *   Submit a pull request with a clear description of your changes!
 
 Let's evolve this agent together!
 
 ---
 
-##  License
+## 📜 License
 
-This project is licensed under the **MIT License**. (You'll need to create a `LICENSE` file with the MIT license text if one doesn't exist).
+This project is licensed under the **MIT License**. See the `LICENSE.md` file for details.
 
 ---
 
-##  Homage
+## 🙏 Homage
 
 OpenAlpha_Evolve is proudly inspired by the pioneering work of Google DeepMind (e.g., AlphaDev) and other related research in LLM-driven code generation and automated discovery. This project aims to make the core concepts more accessible for broader experimentation and learning.
 

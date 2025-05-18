@@ -1,9 +1,10 @@
 # Core Libraries
 google-generativeai  # For Gemini LLMs
-openai >= 1.0.0
+openai >= 1.3.0
 # langchain
 # langchain-google-genai # Or similar for Gemini integration
 python-dotenv # For managing environment variables
+gradio >= 5.0.0 
 
 # LLM Models & Frameworks
 # transformers
