@@ -6,8 +6,8 @@ import asyncio
 import logging
 import sys # Required for sys.maxsize in task definition
 
-from alpha_evolve_pro.task_manager.agent import TaskManagerAgent
-from alpha_evolve_pro.core.interfaces import TaskDefinition
+from task_manager.agent import TaskManagerAgent
+from core.interfaces import TaskDefinition
 # from alpha_evolve_pro.config import settings # Not strictly needed here if TaskManagerAgent handles it
 
 # Configure logging
@@ -97,8 +97,11 @@ async def run_alpha_evolve_pro():
         best_program = await task_manager.execute()
         if best_program:
             logger.info(f"AlphaEvolve Pro finished. Overall best program found for task '{dijkstra_task.id}':")
-            logger.info(f"Program ID: {best_program.program_id}")
-            logger.info(f"Fitness: Correctness={best_program.fitness.get('correctness_score', 'N/A')*100:.2f}%, Runtime={best_program.fitness.get('runtime_ms', 'N/A')}ms")
+            logger.info(f"Program ID: {best_program.id}")
+            # Corrected: Use fitness_scores instead of fitness
+            correctness_score = best_program.fitness_scores.get('correctness_score', 0.0) # Default to 0.0 if not found
+            runtime_ms = best_program.fitness_scores.get('runtime_ms', 'N/A')
+            logger.info(f"Fitness: Correctness={correctness_score*100:.2f}%, Runtime={runtime_ms}ms")
             logger.info(f"Generation: {best_program.generation}")
             logger.info("Code:\n" + best_program.code)
         else:

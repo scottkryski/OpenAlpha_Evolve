@@ -1,75 +1,93 @@
-# Configuration files 
+# config/settings.py
 import os
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(override=True)
 
-# Attempt to load the API key
+# --- LLM Provider Configuration ---
+# Choose your LLM provider: "gemini", "openai", or "openai_compatible"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").lower()
+
+# --- Gemini Configuration (if LLM_PROVIDER is "gemini") ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash-latest") # "gemini-pro" is also an option
 
-# Fallback for development if .env is not set or key is not found,
-# but ensure this is handled securely in production.
-if not GEMINI_API_KEY:
-    # --- IMPORTANT ---
-    # Directly embedding keys is a security risk.
-    # This is a placeholder for local development ONLY.
-    # In a real deployment, use environment variables, secrets management, or other secure methods.
-    # For local testing without a .env file, you can temporarily set it like:
-    # GEMINI_API_KEY = "YOUR_ACTUAL_API_KEY_HERE"
-    # print("Warning: GEMINI_API_KEY not found in .env. Using hardcoded fallback (unsafe for production).")
-    GEMINI_API_KEY = "Your api key here" # Replace with your actual key if testing locally without .env
+# --- OpenAI Configuration (if LLM_PROVIDER is "openai") ---
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL_NAME = os.getenv("OPENAI_MODEL_NAME", "gpt-3.5-turbo") # Or "gpt-4", "gpt-4-turbo-preview", etc.
 
-# LLM Model Configuration
-GEMINI_PRO_MODEL_NAME = "gemini-2.5-flash-preview-04-17" # Using a more capable model
-GEMINI_FLASH_MODEL_NAME = "gemini-2.5-flash-preview-04-17" # Using a more capable model
+# --- OpenAI-Compatible Endpoint Configuration (if LLM_PROVIDER is "openai_compatible") ---
+OPENAI_COMPATIBLE_ENDPOINT_URL = os.getenv("OPENAI_COMPATIBLE_ENDPOINT_URL") # e.g., "http://localhost:11434/v1" for Ollama
+OPENAI_COMPATIBLE_MODEL_NAME = os.getenv("OPENAI_COMPATIBLE_MODEL_NAME") # e.g., "llama3", "codellama"
+# OPENAI_COMPATIBLE_API_KEY is often optional for local endpoints, but can be set if required.
+OPENAI_COMPATIBLE_API_KEY = os.getenv("OPENAI_COMPATIBLE_API_KEY", "not-needed")
+# Context window size (num_ctx) for OpenAI-compatible models, if supported by the server.
+OPENAI_COMPATIBLE_NUM_CTX = os.getenv("OPENAI_COMPATIBLE_NUM_CTX")
+
+
+# LLM Model Configuration (Legacy - specific Gemini models, can be deprecated or used as fallbacks if needed)
+GEMINI_PRO_MODEL_NAME_LEGACY = "gemini-1.5-pro-latest"
+GEMINI_FLASH_MODEL_NAME_LEGACY = "gemini-1.5-flash-latest"
+
 
 # Evolutionary Parameters (examples)
-POPULATION_SIZE = 10  # Number of individuals in each generation
-GENERATIONS = 10       # Number of generations to run
-ELITISM_COUNT = 2     # Number of best individuals to carry over to the next generation
-MUTATION_RATE = 0.7   # Probability of mutating an individual
-CROSSOVER_RATE = 0.2  # Probability of crossing over two parents (if crossover is implemented)
+POPULATION_SIZE = 10
+GENERATIONS = 10
+ELITISM_COUNT = 2
+MUTATION_RATE = 0.7
+CROSSOVER_RATE = 0.2
 
 # Evaluation settings
-EVALUATION_TIMEOUT_SECONDS = 800  # Max time for a program to run during evaluation
+EVALUATION_TIMEOUT_SECONDS = 800
 
-# Database settings (using a simple in-memory store for now)
-DATABASE_TYPE = "in_memory" # or "sqlite", "postgresql" in the future
-DATABASE_PATH = "program_database.json" # Path for file-based DB
+# Database settings
+DATABASE_TYPE = "in_memory"
+DATABASE_PATH = "program_database.json"
 
 # Logging Parameters
-LOG_LEVEL = "INFO" # DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_LEVEL = "INFO"
 LOG_FILE = "alpha_evolve.log"
 
 # API Retry Parameters
 API_MAX_RETRIES = 5
-API_RETRY_DELAY_SECONDS = 10 # Initial delay, will be exponential
+API_RETRY_DELAY_SECONDS = 10
 
-# Placeholder for RL Fine-Tuning (if implemented)
-RL_TRAINING_INTERVAL_GENERATIONS = 50 # Fine-tune RL model every N generations
+# Placeholder for RL Fine-Tuning
+RL_TRAINING_INTERVAL_GENERATIONS = 50
 RL_MODEL_PATH = "rl_finetuner_model.pth"
 
-# Monitoring (if implemented)
-MONITORING_DASHBOARD_URL = "http://localhost:8080" # Example
+# Monitoring
+MONITORING_DASHBOARD_URL = "http://localhost:8080"
 
 # --- Helper function to get a specific setting ---
 def get_setting(key, default=None):
-    """
-    Retrieves a setting value.
-    For LLM models, it specifically checks if the primary choice is available,
-    otherwise falls back to a secondary/default if defined.
-    """
-    # Prioritize environment variables for some settings if needed
-    # For example: return os.getenv(key, globals().get(key, default))
     return globals().get(key, default)
 
-# Example of how to get a model, perhaps with fallback logic (not strictly necessary with current direct assignments)
-def get_llm_model(model_type="pro"):
-    if model_type == "pro":
-        return GEMINI_PRO_MODEL_NAME
-    elif model_type == "flash":
-        return GEMINI_FLASH_MODEL_NAME
-    return GEMINI_FLASH_MODEL_NAME # Default fallback
+# Example of how to get a model, perhaps with fallback logic
+def get_active_llm_model_name():
+    if LLM_PROVIDER == "gemini":
+        return GEMINI_MODEL_NAME
+    elif LLM_PROVIDER == "openai":
+        return OPENAI_MODEL_NAME
+    elif LLM_PROVIDER == "openai_compatible":
+        return OPENAI_COMPATIBLE_MODEL_NAME
+    return "default_model_not_configured"
 
-# Add other global settings here 
+# --- Validate essential configurations based on LLM_PROVIDER ---
+if LLM_PROVIDER == "gemini" and not GEMINI_API_KEY:
+    print("Warning: LLM_PROVIDER is 'gemini' but GEMINI_API_KEY is not set. Functionality will be limited.")
+elif LLM_PROVIDER == "openai" and not OPENAI_API_KEY:
+    print("Warning: LLM_PROVIDER is 'openai' but OPENAI_API_KEY is not set. Functionality will be limited.")
+elif LLM_PROVIDER == "openai_compatible":
+    if not OPENAI_COMPATIBLE_ENDPOINT_URL:
+        print("Warning: LLM_PROVIDER is 'openai_compatible' but OPENAI_COMPATIBLE_ENDPOINT_URL is not set. Functionality will be limited.")
+    if not OPENAI_COMPATIBLE_MODEL_NAME:
+        print("Warning: LLM_PROVIDER is 'openai_compatible' but OPENAI_COMPATIBLE_MODEL_NAME is not set. Functionality will be limited.")
+    if OPENAI_COMPATIBLE_NUM_CTX:
+        try:
+            int(OPENAI_COMPATIBLE_NUM_CTX)
+        except ValueError:
+            print(f"Warning: OPENAI_COMPATIBLE_NUM_CTX ('{OPENAI_COMPATIBLE_NUM_CTX}') is not a valid integer. It might be ignored or cause errors.")
+elif LLM_PROVIDER not in ["gemini", "openai", "openai_compatible"]:
+    print(f"Warning: Unknown LLM_PROVIDER '{LLM_PROVIDER}'. Expected 'gemini', 'openai', or 'openai_compatible'. Defaulting to 'gemini' behavior might occur if not handled by agents.")
