@@ -1,4 +1,3 @@
-# config/settings.py
 import os
 from dotenv import load_dotenv
 
@@ -26,16 +25,20 @@ OPENAI_COMPATIBLE_API_KEY = os.getenv("OPENAI_COMPATIBLE_API_KEY", "not-needed")
 OPENAI_COMPATIBLE_NUM_CTX = os.getenv("OPENAI_COMPATIBLE_NUM_CTX")
 
 
-# LLM Model Configuration (Legacy - specific Gemini models, can be deprecated or used as fallbacks if needed)
-GEMINI_PRO_MODEL_NAME_LEGACY = "gemini-1.5-pro-latest" ### PR REVIEW: Consider removing "LEGACY" if these are just alternative model choices.
-GEMINI_FLASH_MODEL_NAME_LEGACY = "gemini-1.5-flash-latest"
+# LLM Model Configuration (Alternative model choices or fallbacks)
+# ### PR REVIEW: Renamed "LEGACY" to "FALLBACK" for clarity, assuming these are alternative choices.
+# ### If they are truly deprecated and unused, consider removing them.
+GEMINI_MODEL_NAME_PRO_FALLBACK = os.getenv("GEMINI_MODEL_NAME_PRO_FALLBACK", "gemini-1.5-pro-latest")
+GEMINI_MODEL_NAME_FLASH_FALLBACK = os.getenv("GEMINI_MODEL_NAME_FLASH_FALLBACK", "gemini-1.5-flash-latest")
 
 
 # Evolutionary Parameters (examples)
 POPULATION_SIZE = 10
 GENERATIONS = 10
 ELITISM_COUNT = 2
-MUTATION_RATE = 0.7 # ### PR REVIEW: Note: MUTATION_RATE and CROSSOVER_RATE are defined but not directly used by LLM mutation strategy. They might be for future traditional EA operators.
+# ### PR REVIEW: Note: MUTATION_RATE and CROSSOVER_RATE are defined but not directly used by LLM mutation strategy.
+# ### They might be for future traditional EA operators or could be removed if not planned.
+MUTATION_RATE = 0.7
 CROSSOVER_RATE = 0.2
 
 # Evaluation settings

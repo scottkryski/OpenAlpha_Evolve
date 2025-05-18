@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any
 import logging
-import json # ### PR REVIEW: Added missing import
+import json 
 import re
 from core.interfaces import PromptDesignerInterface, Program, TaskDefinition, BaseAgent
 
@@ -68,14 +68,19 @@ class PromptDesignerAgent(PromptDesignerInterface, BaseAgent):
     def _get_argument_list_string(self) -> str:
         """Helper to create a string representation of function arguments for prompts."""
         if self.task_definition.input_output_examples:
-            first_input = self.task_definition.input_output_examples[0].get("input")
-            if isinstance(first_input, dict):
-                return ", ".join(first_input.keys())
-            elif isinstance(first_input, list): # Assuming args are positional for a list
-                return ", ".join([f"arg{i+1}" for i in range(len(first_input))])
-            else: # Single argument
-                return "arg1" # Placeholder
-        return "..." # Default if no examples
+            first_input_example = self.task_definition.input_output_examples[0]
+            if "input" in first_input_example: # Check if "input" key exists
+                first_input = first_input_example["input"]
+                if isinstance(first_input, dict):
+                    return ", ".join(first_input.keys())
+                elif isinstance(first_input, list): # Assuming args are positional for a list
+                    return ", ".join([f"arg{i+1}" for i in range(len(first_input))])
+                # Handle single non-dict/list argument if necessary, e.g. if input is just a number or string
+                elif first_input is not None : # Not a dict, not a list, but not None
+                    return "arg1" 
+            # If "input" key is missing or its value is None, fall through to default
+        return "..." # Default if no examples or input key is missing/None
+
 
     def _get_key_error_advice(self, error_message: str, execution_output: Optional[str], program_code: str) -> str:
         # ### PR REVIEW: This advice is also very specific to graph KeyErrors.
@@ -98,10 +103,7 @@ class PromptDesignerAgent(PromptDesignerInterface, BaseAgent):
             missing_key_raw = key_error_match.group(1)
             # missing_key_cleaned = missing_key_raw.strip("'\"") # Already captured without quotes
 
-            # Check if the error is related to accessing graph[current_node].items() or similar
-            # This check needs to be robust and consider various ways this error can manifest.
-            # Looking for patterns like graph[key] or .items() on a dict access.
-            current_node_access_pattern = r"graph\[\s*(\w+|current_node)\s*\]" # Covers graph[var]
+            current_node_access_pattern = r"graph\[\s*(\w+|current_node)\s*\]" 
             if re.search(current_node_access_pattern, program_code) and \
                (f"graph[{missing_key_raw}]" in error_message or \
                 (execution_output and f"graph[{missing_key_raw}]" in execution_output) or \
@@ -115,7 +117,7 @@ class PromptDesignerAgent(PromptDesignerInterface, BaseAgent):
                     f"Only proceed to access `graph[current_node].items()` if this condition is true. "
                     f"If `current_node` is not in `graph` or `graph[current_node]` is not a dictionary, it means it's a terminal node or has malformed edge data, so you can skip iterating its neighbors.\n"
                 )
-            else: # General advice for KeyError regarding node initialization
+            else: 
                 specific_advice = (
                     f"\nThe error `KeyError: {missing_key_raw}` often indicates that a node (potentially node '{missing_key_raw}') "
                     f"was accessed (e.g., as a neighbor or when trying to look up its distance) but was not properly initialized "
@@ -125,7 +127,8 @@ class PromptDesignerAgent(PromptDesignerInterface, BaseAgent):
                     f"Create a set of all such nodes, and then initialize your distances dictionary (e.g., `distances = {{node: float('inf') for node in all_nodes_in_graph}}`) for every node in this complete set, "
                     f"setting the source node's distance to 0.\n"
                 )
-        elif key_error_match: # General KeyError advice if not a graph task
+        elif key_error_match: 
+             missing_key_raw = key_error_match.group(1) # Ensure missing_key_raw is defined here too
              specific_advice = (
                 f"\nThe error `KeyError: {missing_key_raw}` suggests an attempt to access a dictionary key that does not exist. "
                 f"Review the code to ensure that the key '{missing_key_raw}' is expected to be in the dictionary at that point, "
@@ -139,29 +142,26 @@ class PromptDesignerAgent(PromptDesignerInterface, BaseAgent):
         logger.debug(f"Parent program code:\n{program.code}")
         
         feedback_prompt_segment = ""
-        specific_error_advice = "" # Renamed for clarity
+        specific_error_advice = "" 
 
         if evaluation_feedback:
             logger.debug(f"Evaluation feedback received for parent:\n{json.dumps(evaluation_feedback, indent=2)}")
             fitness_scores = evaluation_feedback.get("fitness_scores", {})
-            if not isinstance(fitness_scores, dict): fitness_scores = {} # Ensure it's a dict
+            if not isinstance(fitness_scores, dict): fitness_scores = {} 
 
-            correctness = fitness_scores.get("correctness_score", 0.0) * 100 # Default to 0.0
+            correctness = fitness_scores.get("correctness_score", 0.0) * 100 
             runtime = fitness_scores.get("runtime_ms", "N/A")
             errors = evaluation_feedback.get("errors", []) 
-            if not isinstance(errors, list): errors = [] # Ensure errors is a list
+            if not isinstance(errors, list): errors = [] 
 
             feedback_prompt_segment = f"The previous version of this code had a correctness score of {correctness:.2f}% and a runtime of {runtime} ms.\n"
             if errors:
-                errors_str = "; ".join([str(e) for e in errors]) # Ensure all errors are strings
+                errors_str = "; ".join([str(e) for e in errors]) 
                 feedback_prompt_segment += f"It produced the following errors/issues during evaluation: {errors_str}\n"
-                # ### PR REVIEW: Get specific advice based on errors.
-                # ### This uses _get_key_error_advice, which is graph-specific.
-                # ### A more general error analysis / advice generation system would be an enhancement.
-                if correctness < 100 or any("error" in str(e).lower() for e in errors): # If low correctness or explicit errors
+                if correctness < 100 or any("error" in str(e).lower() for e in errors): 
                     specific_error_advice = self._get_key_error_advice(errors_str, errors_str, program.code)
             
-            if correctness < 100 and not errors and not specific_error_advice: # No execution errors, but logical failures
+            if correctness < 100 and not errors and not specific_error_advice: 
                 feedback_prompt_segment += "It did not achieve 100% correctness but did not produce explicit execution errors. Review logic for test case failures based on the task's input/output examples. Focus on edge cases or complex scenarios described in the task.\n"
         else:
             feedback_prompt_segment = "The previous version of this code was evaluated, but detailed feedback is not available. Attempt a general improvement based on the task requirements.\n"
@@ -174,10 +174,9 @@ class PromptDesignerAgent(PromptDesignerInterface, BaseAgent):
             f"Allowed standard library imports: {self.task_definition.allowed_imports if self.task_definition.allowed_imports else 'None specified'}.\n\n"
             f"Current Code (to be improved):\n```python\n{program.code}\n```\n\n"
             f"Evaluation Feedback on Current Code:\n{feedback_prompt_segment}\n"
-            f"{specific_error_advice if specific_error_advice else ''}\n" # Conditionally add specific advice
+            f"{specific_error_advice if specific_error_advice else ''}\n" 
             f"Instruction: Based on the task, the current code, and the evaluation feedback, provide an improved version of the function `{self.task_definition.function_name_to_evolve}`. "
             f"Focus on improving correctness to pass all test cases (refer to task description for examples and the specific advice above if an error was mentioned) and then efficiency. "
-            # Removed graph-specific instruction from here, as specific_error_advice should cover it if relevant.
             f"\n\nIMPORTANT: Provide ONLY the complete Python code for the improved function `{self.task_definition.function_name_to_evolve}`. "
             f"The function should be self-contained or use only the allowed imports. "
             f"Do NOT include any surrounding text, explanations, example usage, or markdown code fences (like ```python). "
@@ -195,7 +194,6 @@ class PromptDesignerAgent(PromptDesignerInterface, BaseAgent):
 
         output_segment = f"Additional Context (e.g., full list of errors or relevant prior outputs):\n{execution_output}\n" if execution_output else "No detailed execution output was captured beyond the primary error.\n"
         
-        # ### PR REVIEW: Again, _get_key_error_advice is graph-specific.
         specific_error_advice = self._get_key_error_advice(error_message, execution_output, program.code)
 
         prompt = (
@@ -209,7 +207,6 @@ class PromptDesignerAgent(PromptDesignerInterface, BaseAgent):
             f"{output_segment}"
             f"{specific_error_advice if specific_error_advice else ''}\n" 
             f"Instruction: The above code produced an error or failed test cases. Please analyze the code, the error, any provided context, and the specific advice (if any) to identify and fix the bug(s). "
-            # Removed graph-specific instruction here too.
             f"\n\nIMPORTANT: Provide ONLY the complete Python code for the fixed function `{self.task_definition.function_name_to_evolve}`. "
             f"The function should be self-contained or use only the allowed imports. "
             f"Do NOT include any surrounding text, explanations, example usage, or markdown code fences (like ```python). "
@@ -243,8 +240,7 @@ class PromptDesignerAgent(PromptDesignerInterface, BaseAgent):
                 "Call specific design methods directly or provide a valid action."
             )
 
-# Example Usage:
-async def main_test(): # ### PR REVIEW: Made test main async for execute calls
+async def main_test():
     logging.basicConfig(level=logging.DEBUG)
 
     sample_task_def = TaskDefinition(
@@ -266,8 +262,8 @@ async def main_test(): # ### PR REVIEW: Made test main async for execute calls
 
     sample_program = Program(
         id="prog_001",
-        code="def sum_list(numbers):\n  # Buggy implementation\n  s = 0\n  for x in numbers:\n    s += x\n  return s if numbers else 'Error'", # Corrected sum part, kept error for demo
-        fitness_scores={"correctness_score": 0.5, "runtime_ms": 10.0}, # Assuming one case passes, one fails
+        code="def sum_list(numbers):\n  # Buggy implementation\n  s = 0\n  for x in numbers:\n    s += x\n  return s if numbers else 'Error'", 
+        fitness_scores={"correctness_score": 0.5, "runtime_ms": 10.0}, 
         generation=1,
         errors=["Test case 2 (Input: {'numbers': []}): Failed. Expected '0', Got ''Error''"]
     )
@@ -283,7 +279,7 @@ async def main_test(): # ### PR REVIEW: Made test main async for execute calls
 
     try:
         print("\n--- Testing Execute with Action (Initial Prompt) ---")
-        initial_via_execute = await designer.execute(action="design_initial_prompt") # await if execute becomes async
+        initial_via_execute = await designer.execute(action="design_initial_prompt") 
         print(f"Initial prompt via execute: {initial_via_execute[:150]}...") 
     except NotImplementedError as e:
          print(f"Error during execute with action: {e}")
@@ -292,5 +288,6 @@ async def main_test(): # ### PR REVIEW: Made test main async for execute calls
 
 
 if __name__ == '__main__':
-    import asyncio # ### PR REVIEW: Added asyncio import for the test runner
+    import asyncio
+    # ### PR REVIEW: Moved asyncio.run() into the __main__ block.
     asyncio.run(main_test())
